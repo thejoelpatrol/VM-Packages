@@ -5,7 +5,8 @@ VM-Remove-PreviousZipPackage ${Env:chocolateyPackageFolder}
 
 try {
     $toolSrcDir = "$(Split-Path -parent $MyInvocation.MyCommand.Definition)"
-    
+    $toolDir = Join-Path ${Env:RAW_TOOLS_DIR} 'x64dbg\release' -Resolve
+
     $packageArgs = @{
         packageName   = ${Env:ChocolateyPackageName}
         unzipLocation = $toolSrcDir
@@ -19,7 +20,7 @@ try {
 
     $archs = @("x32", "x64")
     foreach ($arch in $archs) {
-        $archDstDir = Join-Path ${Env:RAW_TOOLS_DIR} "x64dbg\release\${arch}" -Resolve
+        $archDstDir = Join-Path $toolDir "${arch}" -Resolve
         $pluginDstDir = Join-Path $archDstDir 'plugins'
         if (-Not (Test-Path $pluginDstDir -PathType Container)) {
             New-Item -ItemType directory $pluginDstDir -Force -ea 0 | Out-Null
@@ -41,11 +42,11 @@ try {
     }
 
     # Move the NewProcessWatcher and text files into the main x64dbg directory
-    $releasePath = Join-Path $toolSrcDir 'release'
-    $x64dbgPath = Join-Path ${Env:RAW_TOOLS_DIR} 'x64dbg\release' -Resolve
-    Get-ChildItem -Path $releasePath -File | Move-Item -Destination $x64dbgPath -Force -vb
-    if (-Not(Test-Path "${x64dbgPath}\dbgchildlogs" -PathType Container)) {
-        Move-Item -Path "${releasePath}\dbgchildlogs" -Destination $x64dbgPath -vb
+    $releaseSrcDir = Join-Path $toolSrcDir 'release'
+    
+    Get-ChildItem -Path $releaseSrcDir -File | Move-Item -Destination $toolDir -Force -vb
+    if (-Not(Test-Path "${toolDir}\dbgchildlogs" -PathType Container)) {
+        Move-Item -Path "${releaseSrcDir}\dbgchildlogs" -Destination $toolDir -vb
     }
 
     Remove-Item -Path $toolSrcDir -Recurse -Force -ea 0
@@ -54,8 +55,8 @@ try {
 }
 
 # Make sure at least one of the files in each dir ended up in the right place
-VM-Assert-Path "${Env:RAW_TOOLS_DIR}\x64dbg\release\NewProcessWatcher.exe"
-VM-Assert-Path "${Env:RAW_TOOLS_DIR}\x64dbg\release\x32\CreateProcessPatch.exe"
-VM-Assert-Path "${Env:RAW_TOOLS_DIR}\x64dbg\release\x64\CreateProcessPatch.exe"
-VM-Assert-Path "${Env:RAW_TOOLS_DIR}\x64dbg\release\x32\plugins\dbgchild.dp32"
-VM-Assert-Path "${Env:RAW_TOOLS_DIR}\x64dbg\release\x64\plugins\dbgchild.dp64"
+VM-Assert-Path "${toolDir}\NewProcessWatcher.exe"
+VM-Assert-Path "${toolDir}\x32\CreateProcessPatch.exe"
+VM-Assert-Path "${toolDir}\x64\CreateProcessPatch.exe"
+VM-Assert-Path "${toolDir}\x32\plugins\dbgchild.dp32"
+VM-Assert-Path "${toolDir}\x64\plugins\dbgchild.dp64"
