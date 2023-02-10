@@ -1,6 +1,8 @@
 $ErrorActionPreference = 'Stop'
 Import-Module vm.common -Force -DisableNameChecking
 
+VM-Remove-PreviousZipPackage ${Env:chocolateyPackageFolder}
+
 try {
     $toolSrcDir = "$(Split-Path -parent $MyInvocation.MyCommand.Definition)"
     
@@ -40,7 +42,7 @@ try {
 
     # Move the NewProcessWatcher and text files into the main x64dbg directory
     $releasePath = Join-Path $toolSrcDir 'release'
-    $x64dbgPath = Join-Path ${Env:RAW_TOOLS_DIR} 'x64dbg\release'
+    $x64dbgPath = Join-Path ${Env:RAW_TOOLS_DIR} 'x64dbg\release' -Resolve
     Get-ChildItem -Path $releasePath -File | Move-Item -Destination $x64dbgPath -Force -vb
     if (-Not(Test-Path "${x64dbgPath}\dbgchildlogs" -PathType Container)) {
         Move-Item -Path "${releasePath}\dbgchildlogs" -Destination $x64dbgPath -vb
@@ -50,3 +52,10 @@ try {
 } catch {
     VM-Write-Log-Exception $_
 }
+
+# Make sure at least one of the files in each dir ended up in the right place
+VM-Assert-Path "${Env:RAW_TOOLS_DIR}\x64dbg\release\NewProcessWatcher.exe"
+VM-Assert-Path "${Env:RAW_TOOLS_DIR}\x64dbg\release\x32\CreateProcessPatch.exe"
+VM-Assert-Path "${Env:RAW_TOOLS_DIR}\x64dbg\release\x64\CreateProcessPatch.exe"
+VM-Assert-Path "${Env:RAW_TOOLS_DIR}\x64dbg\release\x32\plugins\dbgchild.dp32"
+VM-Assert-Path "${Env:RAW_TOOLS_DIR}\x64dbg\release\x64\plugins\dbgchild.dp64"
