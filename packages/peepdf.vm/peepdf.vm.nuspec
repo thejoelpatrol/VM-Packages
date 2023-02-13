@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>peepdf.vm</id>
+    <version>0.4.3.20220515</version>
+    <description>peepdf: The aim of this tool is to provide all the necessary components that a security researcher could need in a PDF analysis without using 3 or 4 tools to make all the tasks.</description>
+    <authors>Jose Miguel Esparza, Jurriaan Bremer</authors>
+    <dependencies>
+      <dependency id="common.vm" />
+    </dependencies>
+  </metadata>
+</package>
