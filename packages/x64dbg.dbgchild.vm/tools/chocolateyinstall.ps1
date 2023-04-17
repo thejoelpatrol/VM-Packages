@@ -29,7 +29,7 @@ try {
         # Move 32/64-bit plugin DLL itself into the arch directory
         $pluginSrcPath = Join-Path $toolSrcDir "release\${arch}\plugins" -Resolve
         Get-ChildItem -Path $pluginSrcPath -File | Move-Item -Destination $pluginDstDir -Force
-        
+
         # Note that we don't simply move all children including directories, because we don't want to overwrite plugins
 
         # Move all the other arch-specific files
@@ -42,7 +42,7 @@ try {
 
     # Move the NewProcessWatcher and text files into the main x64dbg directory
     $releaseSrcDir = Join-Path $toolSrcDir 'release'
-    
+
     Get-ChildItem -Path $releaseSrcDir -File | Move-Item -Destination $toolDir -Force
     if (-Not(Test-Path "${toolDir}\dbgchildlogs" -PathType Container)) {
         Move-Item -Path "${releaseSrcDir}\dbgchildlogs" -Destination $toolDir
