@@ -4,8 +4,7 @@ Import-Module vm.common -Force -DisableNameChecking
 $toolName = 'capa'
 $category = 'Utilities'
 
-$zipUrl = "https://github.com/mandiant/capa/releases/download/v5.1.0/capa-v5.1.0-windows.zip"
-$zipSha256 = "80ac9adfd095cb631a6fa39743b37444651e4129b4181fd34c8b8b3e53bc5b06"
+$zipUrl = "https://github.com/mandiant/capa/releases/download/v7.0.1/capa-v7.0.1-windows.zip"
+$zipSha256 = "05bac209f50302308e37eb658fe36a40418aa9c37f57d440355706e13cabc43d"
 
-VM-Install-From-Zip $toolName $category $zipUrl -zipSha256 $zipSha256 -consoleApp $true
-
+VM-Install-From-Zip $toolName $category $zipUrl -zipSha256 $zipSha256 -consoleApp $true -arguments "--help"

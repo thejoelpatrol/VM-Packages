@@ -1,0 +1,31 @@
+Command & Control
+Credential Access
+Debuggers
+Delphi
+Disassemblers
+Documents
+dotNet
+Exploitation
+File Information
+Forensic
+Hex Editors
+InnoSetup
+Java & Android
+Javascript
+Lateral Movement
+Memory
+Networking
+Packers
+Payload Development
+PE
+Persistence
+PowerShell
+Privilege Escalation
+Productivity Tools
+Reconnaissance
+Registry
+Shellcode
+Utilities
+Visual Basic
+Web Application
+Wordlists

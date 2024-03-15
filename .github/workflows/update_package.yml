@@ -12,12 +12,12 @@ jobs:
     runs-on: windows-2022
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - name: Install python dependency 'requests'
         run: pip install requests
       - name: Set git up
         run: |
-          git config user.email 'vm-packages@mandiant.com'
+          git config user.email 'vm-packages@google.com'
           git config user.name 'vm-packages'
       - name: Update packages
         run: |
@@ -25,41 +25,46 @@ jobs:
           New-Item test_logs -itemType Directory | Out-Null
           foreach ($packagePath in (Get-ChildItem packages)){
             $package = $packagePath.Name
-            $version = python scripts\utils\update_package.py $package
-            $updated = $?
-            echo "$package $version"
-            if ($updated -and $version) {
-              # Test package before committing
-              scripts\test\test_install.ps1 $package *>> "test_logs/$package.txt"
-              $tested = $?
-              cd $root
-              if ($tested) {
-                git add "packages/$package/"
-                git commit -m "Update $package to $version"
-              } else {
-                echo "$package $version FAILED"
+            $newVersion = 0
+            # Test indepdendly every type of update and commit what works
+            foreach ($UPDATE_TYPE in ('DEPENDENCIES', 'GITHUB_URL', 'VERSION_URL')) {
+              $version = python scripts\utils\update_package.py $package --update_type $UPDATE_TYPE
+              $updated = $?
+              echo "$package $version"
+              if ($updated -and $version) {
+                # Test package before committing
+                scripts\test\test_install.ps1 -max_tries 1 $package | out-null
+                $tested = $?
+                cd $root
+                if ($tested) {
+                  git add "packages/$package/"
+                  $newVersion = $version
+                } else {
+                  echo "$package $version FAILED"
+                  git diff
+                }
               }
+              # Clean changes and built packages
+              git restore .
+              Remove-Item built_pkgs -Recurse -ErrorAction Ignore
             }
-            # Clean changes and built packages
-            git restore .
-            Remove-Item built_pkgs -Recurse -ErrorAction Ignore
+            if ($newVersion) {
+              git commit -m "Update $package to $newVersion"
+            }
           }
           Exit(0)
+      - name: Upload logs to artifacts
+        uses: ./.github/actions/upload-logs
+        if: always()
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v4
+        uses: peter-evans/create-pull-request@a4f52f8033a6168103c2538976c07b467e8163bc # v6.0.1
         with:
           title: ':robot: Package update'
           body: 'Automated package update'
           branch: package-update
-          author: vm-packages <vm-packages@mandiant.com>
+          author: vm-packages <vm-packages@google.com>
           add-paths: packages/*
           # GH actions can not trigger other GH actions,
           # use a Personal Access Token to trigger the CI workflow in the created PR
           token: ${{ secrets.REPO_TOKEN }}
-      - name: Upload test output to assets
-        uses: actions/upload-artifact@v3
-        if: always()
-        with:
-          name: test_logs
-          path: test_logs/
 

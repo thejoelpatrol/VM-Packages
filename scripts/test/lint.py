@@ -20,6 +20,7 @@ import pathlib
 import argparse
 import datetime
 import subprocess
+import re
 from typing import Dict
 from xml.dom import minidom
 
@@ -79,7 +80,6 @@ def run_cmd(cmd):
 
 
 class IncludesRequiredFieldsOnly(Lint):
-    EXCLUSIONS = ["flarevm.installer.vm"]
     name = "file lists non-required fields"
     allowed_fields = [
         "id",
@@ -91,9 +91,6 @@ class IncludesRequiredFieldsOnly(Lint):
     recommendation = f"Only include required fields: {', '.join(allowed_fields)}"
 
     def check(self, path):
-        if any([exclusion in str(path) for exclusion in self.EXCLUSIONS]):
-            return False
-
         dom = minidom.parse(str(path))
         metadata = dom.getElementsByTagName("metadata")[0]
 
@@ -286,7 +283,7 @@ class MissesImportCommonVm(Lint):
 
 
 class FirstLineDoesNotSetErrorAction(Lint):
-    EXCLUSIONS = ["libraries.python2.vm", "libraries.python3.vm", "flarevm.installer.vm"]
+    EXCLUSIONS = ["libraries.python2.vm", "libraries.python3.vm", "installer.vm"]
     FIRST_LINE = "$ErrorActionPreference = 'Stop'"
     name = "first line must set error handling to stop"
     recommendation = f"add `{FIRST_LINE}` to the file"
@@ -302,14 +299,67 @@ class FirstLineDoesNotSetErrorAction(Lint):
         return not self.FIRST_LINE == lines[0]
 
 
+class UsesInvalidCategory(Lint):
+    # Some packages don't have a category (we don't create a link in the tools directory)
+    EXCLUSIONS = [
+        ".ollydumpex.vm",
+        ".scyllahide.vm",
+        "7zip-15-05.vm",
+        "common.vm",
+        "debloat.vm",
+        "dokan.vm",
+        "googlechrome.vm",
+        "ida.plugin.capa.vm",
+        "idafree.vm",
+        "installer.vm",
+        "libraries.python2.vm",
+        "libraries.python3.vm",
+        "microsoft-windows-terminal.vm",
+        "notepadplusplus.vm",
+        "notepadpp.plugin.",
+        "npcap.vm",
+        "openjdk.vm",
+        "python3.vm",
+        "x64dbgpy.vm",
+    ]
+
+    root_path = os.path.abspath(os.path.join(__file__, "../../.."))
+    categories_txt = os.path.join(root_path, "categories.txt")
+    with open(categories_txt) as file:
+        CATEGORIES = [line.rstrip() for line in file]
+        logger.debug(CATEGORIES)
+
+    name = "Uses an invalid category"
+    recommendation = f"Set $category to a category in {categories_txt} or exclude the package in the linter"
+
+    def check(self, path):
+        if any([exclusion in str(path) for exclusion in self.EXCLUSIONS]):
+            return False
+
+        # utf-8-sig ignores BOM
+        file_content = open(path, "r", encoding="utf-8-sig").read()
+
+        match = re.search("\$category = ['\"](?P<category>[\w &/]+)['\"]", file_content)
+        if not match or match.group("category") not in self.CATEGORIES:
+            return True
+        return False
+
+
 INSTALL_LINTS = (
     MissesImportCommonVm(),
     FirstLineDoesNotSetErrorAction(),
+    UsesInvalidCategory(),
 )
+
+UNINSTALL_LINTS = (UsesInvalidCategory(),)
 
 
 def lint_install(path):
     return run_lints(INSTALL_LINTS, path)
+
+
+def lint_uninstall(path):
+    return run_lints(UNINSTALL_LINTS, path)
 
 
 def lint(path) -> Dict[str, list]:
@@ -334,6 +384,8 @@ def lint(path) -> Dict[str, list]:
                 violations.extend(lint_nuspec(path))
             elif "chocolateyinstall.ps1" in name:
                 violations.extend(lint_install(path))
+            elif "chocolateyuninstall.ps1" in name:
+                violations.extend(lint_uninstall(path))
 
             ret[str(path)] = violations
 

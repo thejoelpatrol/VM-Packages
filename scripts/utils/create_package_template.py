@@ -3,6 +3,7 @@ import sys
 import logging
 import argparse
 import textwrap
+import time
 
 # Set up logger
 logging.basicConfig(
@@ -14,38 +15,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-# categories must be synchronized with the issue templates
-CATEGORIES = (
-    "Android",
-    "Cloud",
-    "Debuggers",
-    "Delphi",
-    "Disassemblers",
-    "dotNet",
-    "Forensic",
-    "Hex Editors",
-    "Java",
-    "Javascript",
-    "Networking",
-    "Office",
-    "PDF",
-    "PE",
-    "PowerShell",
-    "Python",
-    "Text Editors",
-    "Utilities",
-    "VB",
-    # CommandoVM
-    "Active Directory",
-    "Command & Control",
-    "Evasion",
-    "Exploitation",
-    "Information Gathering",
-    "Password Attacks",
-    "Vulnerability Analysis",
-    "Web Application",
-    "Wordlists",
-)
+root_path = os.path.abspath(os.path.join(__file__ ,"../../.."))
+with open(f"{root_path}/categories.txt") as file:
+    CATEGORIES = [line.rstrip() for line in file]
+
+# If the dependency/tool's version uses the 4th segment, update the package's
+# version to use the current date (YYYYMMDD) in the 4th segment
+def package_version(dependency_version):
+    version_segments = dependency_version.split(".")
+    if len(version_segments) < 4:
+        return dependency_version
+    version_segments[3] =  time.strftime("%Y%m%d")
+    return ".".join(version_segments[:4])
 
 UNINSTALL_TEMPLATE_NAME = "chocolateyuninstall.ps1"
 INSTALL_TEMPLATE_NAME = "chocolateyinstall.ps1"
@@ -71,7 +52,7 @@ NUSPEC_TEMPLATE = r"""<?xml version="1.0" encoding="utf-8"?>
 
 """
 Needs the following format strings:
-    pkg_name="...", version="...", authors="...", description="...", dependency="..."
+    pkg_name="...", version="...", authors="...", description="...", dependency="...", dependency_version="..."
 """
 NUSPEC_TEMPLATE_METAPACKAGE = r"""<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
@@ -82,7 +63,7 @@ NUSPEC_TEMPLATE_METAPACKAGE = r"""<?xml version="1.0" encoding="utf-8"?>
     <description>{description}</description>
     <dependencies>
       <dependency id="common.vm" />
-      <dependency id="{dependency}" version="[{version}]" />
+      <dependency id="{dependency}" version="[{dependency_version}]" />
     </dependencies>
   </metadata>
 </package>
@@ -90,7 +71,7 @@ NUSPEC_TEMPLATE_METAPACKAGE = r"""<?xml version="1.0" encoding="utf-8"?>
 
 """
 Needs the following format strings:
-    tool_name="...", category="...", target_url="...", target_hash="..."
+    tool_name="...", category="...", target_url="...", target_hash="...", console_app="..."
 """
 ZIP_EXE_TEMPLATE = r"""$ErrorActionPreference = 'Stop'
 Import-Module vm.common -Force -DisableNameChecking
@@ -101,7 +82,7 @@ $category = '{category}'
 $zipUrl = '{target_url}'
 $zipSha256 = '{target_hash}'
 
-VM-Install-From-Zip $toolName $category $zipUrl -zipSha256 $zipSha256
+VM-Install-From-Zip $toolName $category $zipUrl -zipSha256 $zipSha256 -consoleApp ${console_app} -innerFolder ${inner_folder}
 """
 
 """
@@ -132,11 +113,8 @@ try {{
   $category = '{category}'
   $shimPath = '{shim_path}'
 
-  $shortcutDir = Join-Path ${{Env:TOOL_LIST_DIR}} $category
-  $shortcut = Join-Path $shortcutDir "$toolName.lnk"
   $executablePath = Join-Path ${{Env:ChocolateyInstall}} $shimPath -Resolve
-  Install-ChocolateyShortcut -shortcutFilePath $shortcut -targetPath $executablePath -RunAsAdmin
-  VM-Assert-Path $shortcut
+  VM-Install-Shortcut -toolName $toolName -category $category -executablePath $executablePath -runAsAdmin
 }} catch {{
   VM-Write-Log-Exception $_
 }}
@@ -144,7 +122,7 @@ try {{
 
 """
 Needs the following format strings:
-    tool_name="...", category="...", target_url="...", target_hash="..."
+    tool_name="...", category="...", target_url="...", target_hash="...", console_app="..."
 """
 SINGLE_EXE_TEMPLATE = r"""$ErrorActionPreference = 'Stop'
 Import-Module vm.common -Force -DisableNameChecking
@@ -155,7 +133,7 @@ $category = '{category}'
 $exeUrl = '{target_url}'
 $exeSha256 = '{target_hash}'
 
-VM-Install-Single-Exe $toolName $category $exeUrl -exeSha256 $exeSha256
+VM-Install-Single-Exe $toolName $category $exeUrl -exeSha256 $exeSha256 -consoleApp ${console_app}
 """
 
 """
@@ -228,6 +206,8 @@ def create_zip_exe_template(packages_path, **kwargs):
         category=kwargs.get("category"),
         target_url=kwargs.get("target_url"),
         target_hash=kwargs.get("target_hash"),
+        console_app=kwargs.get("console_app"),
+        inner_folder=kwargs.get("inner_folder"),
     )
 
 
@@ -260,6 +240,7 @@ def create_single_exe_template(packages_path, **kwargs):
         category=kwargs.get("category"),
         target_url=kwargs.get("target_url"),
         target_hash=kwargs.get("target_hash"),
+        console_app=kwargs.get("console_app"),
     )
 
 
@@ -293,6 +274,8 @@ def create_template(
     target_hash="",
     shim_path="",
     dependency="",
+    console_app="",
+    inner_folder="",
 ):
     pkg_path = os.path.join(packages_path, f"{pkg_name}.vm")
     try:
@@ -310,10 +293,11 @@ def create_template(
         f.write(
             nuspec_template.format(
                 pkg_name=pkg_name,
-                version=version or "0.0.0",
+                version=package_version(version) or "0.0.0",
                 authors=authors,
                 description=description,
                 dependency=dependency,
+                dependency_version = version,
             )
         )
 
@@ -325,6 +309,8 @@ def create_template(
                 target_url=target_url,
                 target_hash=target_hash,
                 shim_path=shim_path,
+                console_app=console_app,
+                inner_folder=inner_folder
             )
         )
 
@@ -370,6 +356,7 @@ TYPES = {
             "category",
             "target_url",
             "target_hash",
+            "console_app",
         ],
     },
     "SINGLE_PS1": {
@@ -485,6 +472,8 @@ def main(argv=None):
     parser.add_argument("--target_url", type=str, default="", help="URL to target file (zip or executable)")
     parser.add_argument("--target_hash", type=str, default="", help="SHA256 hash of target file (zip or executable)")
     parser.add_argument("--shim_path", type=str, default="", help="Metapackage shim path")
+    parser.add_argument("--console_app", type=str, default="false", choices=["false", "true"],  help="The tool is a console application, the shortcut should run it with `cmd /K $toolPath --help` to be able to see the output.")
+    parser.add_argument("--inner_folder", type=str, default="false", choices=["false", "true"],  help="The ZIP file unzip to a single folder that contains all the tools.")
     args = parser.parse_args(args=argv)
 
     if args.type is None:

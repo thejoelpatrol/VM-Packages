@@ -12,44 +12,63 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
+      # Updating the wiki fails if between the checkout of the wiki and the push of the update the other job pushes its update
+      max-parallel: 1
       matrix:
         os: [windows-2019, windows-2022]
+        include:
+          - os: windows-2022
+            os_name: Win22
+          - os: windows-2019
+            os_name: Win19
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - name: Build and test all packages
-        id: test
-        run: scripts/test/test_install.ps1 -all
-      - name: Display log warnings and errors
+        run: scripts/test/test_install.ps1 -all -max_tries 3
+      - name: Upload logs to artifacts
+        uses: ./.github/actions/upload-logs
         if: always()
-        run: if (Test-Path -Path C:\ProgramData\_VM\log.txt ) { Select-String "ERR|WARN" -CaseSensitive -Context 0,5 C:\ProgramData\_VM\log.txt }
-      - name: Update badges in README
-        if: always() && matrix.os == 'windows-2022'
-        run: |
-          # test_install.ps1 writes success_failure.json with contents: `{success: n, failure: m}`
-          $succ = (Get-Content "success_failure.json" | ConvertFrom-Json).success
-          $fail = (Get-Content "success_failure.json" | ConvertFrom-Json).failure
-          $total = (Get-Content "success_failure.json" | ConvertFrom-Json).total
-          # URL format: `https://img.shields.io/badge/pkgs--install--pass-1337-green.svg`
-          (Get-Content README.md) -replace 'pkgs--install--pass-(\d{1,})-', "pkgs--install--pass-$succ-" -replace 'pkgs--install--fail-(\d{1,})-', "pkgs--install--fail-$fail-" -replace 'packages-(\d{1,})-blue', "packages-$total-blue" | Out-File README.md
+      - name: Checkout wiki code
+        if: always()
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          repository: ${{ github.repository }}.wiki
+          path: wiki
+      - name: Add results to wiki
+        if: always()
+        run: python scripts/utils/generate_daily_results.py ${{ github.repository }} ${{ github.sha }} ${{ github.run_number }} ${{ github.run_id }} ${{ matrix.os }}
       - name: Commit changes
-        if: always() && matrix.os == 'windows-2022'
-        run: |
-          git config user.email 'vm-packages@mandiant.com'
-          git config user.name 'vm-packages'
-          git add README.md
-          git commit -m 'Update daily success/failure badges'
-      - name: Push changes
-        if: always() && matrix.os == 'windows-2022'
-        uses: ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.REPO_TOKEN }}
-      - name: Upload chocolatey logs to artifacts
-        uses: actions/upload-artifact@v3
         if: always()
+        working-directory: wiki
+        run: |
+          git config user.email 'vm-packages@google.com'
+          git config user.name 'vm-packages'
+          git commit -am 'Add daily results'
+          git push
+      - name: Get badge info
+        if: always()
+        run: |
+          pwd
+          $json = Get-Content -Raw "success_failure.json" | ConvertFrom-Json
+          $failure = $json.failure
+          $total = $json.total
+          $message = "$failure/$total"
+          # Celebrate that there are not failures
+          if (-not $failure) { $message += " 🎉" }
+          echo "failure=$failure" >> $env:GITHUB_ENV
+          echo "message=$message" >> $env:GITHUB_ENV
+      - name: Update dynamic badge gist
+        if: always()
+        uses: schneegans/dynamic-badges-action@e9a478b16159b4d31420099ba146cdc50f134483 # v1.7.0
         with:
-          name: logs-${{ matrix.os }}.zip
-          path: |
-            C:\ProgramData\chocolatey\logs\chocolatey.log
-            C:\ProgramData\chocolatey\lib-bad\**\tools\install_log.txt
-            C:\ProgramData\_VM\log.txt
+          auth: ${{ secrets.REPO_TOKEN }}
+          gistID: 7d6b2592948d916eb5529350308f01d1
+          filename: ${{ matrix.os }}_daily_badge.svg
+          label: "failures ${{ matrix.os_name }}"
+          message: "${{ env.message }}"
+          # Use orange if only 1 package fails and red if more than 1 fail
+          maxColorRange: 1.25
+          minColorRange: 0
+          invertColorRange: true
+          valColorRange: ${{ env.failure }}

@@ -50,32 +50,34 @@ body:
       label: Category
       description: Which category should this tool be installed to?
       options:
-        - Android
-        - Cloud
+        - Command & Control
+        - Credential Access
         - Debuggers
         - Delphi
         - Disassemblers
         - dotNet
+        - Documents
+        - Exploitation
+        - File Information
         - Forensic
         - Hex Editors
-        - Java
+        - InnoSetup
+        - Java & Android
         - Javascript
+        - Lateral Movement
+        - Memory
         - Networking
-        - Office
-        - PDF
+        - Packers
+        - Payload Development
         - PE
-        - PowerShell
-        - Python
-        - Text Editors
+        - Persistence
+        - Privilege Escalation
+        - Productivity Tools
+        - Reconnaissance
+        - Registry
+        - Shellcode
         - Utilities
-        - VB
-        - Active Directory
-        - Command & Control
-        - Evasion
-        - Exploitation
-        - Information Gathering
-        - Password Attacks
-        - Vulnerability Analysis
+        - Visual Basic
         - Web Application
         - Wordlists
   - type: input
@@ -107,7 +109,7 @@ body:
       required: true
     attributes:
       label: Shim path
-      description: Installed Chocolatey packages automatically create "shims" (i.e., executable proxies) to the installed applications. The default Chocolatey shim location is `%PROGRAMDATA%\chocolatey\bin`. Please provide the path for the Chocolatey "shimmed" executable (e.g., `%PROGRAMDATA%\chocolatey\bin\ollydbg.exe`).
+      description: Installed Chocolatey packages automatically create "shims" (i.e., executable proxies) to the installed applications. The default Chocolatey shim location is `%PROGRAMDATA%\chocolatey\bin`. Provide the path for the Chocolatey "shimmed" executable relative to the `$Env:ChocolateyInstall` path (i.e., `%PROGRAMDATA%\chocolatey`). For example, provide a path like `bin\ollydbg.exe`.
   - type: textarea
     id: why
     attributes:
