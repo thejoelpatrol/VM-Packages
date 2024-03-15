@@ -2,11 +2,11 @@ $ErrorActionPreference = 'Stop'
 Import-Module vm.common -Force -DisableNameChecking
 
 try {
-    $downloadDir = "$(Split-Path -parent $MyInvocation.MyCommand.Definition)"
+    $tempDownloadDir = Join-Path ${Env:chocolateyPackageFolder} "temp_$([guid]::NewGuid())"
     $toolDir = Join-Path ${Env:RAW_TOOLS_DIR} 'x64dbg\release' -Resolve
     $packageArgs = @{
         packageName   = ${Env:ChocolateyPackageName}
-        unzipLocation = $downloadDir
+        unzipLocation = $tempDownloadDir
         url           = 'https://github.com/therealdreg/DbgChild/releases/download/beta10/DbgChild.Beta.10.zip'
         checksum      = 'f17f588795d8f5f94d71335a8acfa58946bb03a94a5637be7f3e804c652ea2b4'
         checksumType  = 'sha256'
@@ -14,7 +14,7 @@ try {
 
     VM-Remove-PreviousZipPackage ${Env:chocolateyPackageFolder}
     Install-ChocolateyZipPackage @packageArgs
-    $unzippedDir = (Get-ChildItem -Directory $downloadDir | Where-Object {$_.PSIsContainer} | Select-Object -f 1).FullName
+    $unzippedDir = (Get-ChildItem -Directory $tempDownloadDir | Where-Object {$_.PSIsContainer} | Select-Object -f 1).FullName
     VM-Assert-Path $unzippedDir
 
     $archs = @("x32", "x64")
@@ -55,7 +55,8 @@ try {
     VM-Assert-Path "${toolDir}\x32\plugins\dbgchild.dp32"
     VM-Assert-Path "${toolDir}\x64\plugins\dbgchild.dp64"
 
-    Remove-Item -Path $unzippedDir -Recurse -Force -ea 0
+    # $unzippedDir is in $tempDownloadDir, so this should clean up both of them
+    Remove-Item $tempDownloadDir -Recurse -Force -ea 0
 } catch {
     VM-Write-Log-Exception $_
 }
